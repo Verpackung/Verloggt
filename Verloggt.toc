@@ -1,0 +1,9 @@
+## Interface: 110002
+## Title: Verloggt
+## Notes: Reads combat log
+## Author: Verpackung
+## Version: 0.0.1
+
+
+
+Verloggt.lua
