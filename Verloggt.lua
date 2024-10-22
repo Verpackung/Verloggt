@@ -30,8 +30,9 @@ local allEncouters = "Logging all Encounters!"
 local slashStatus = "status"
 local slashBoss = "boss"
 VerloggtSettings = VerloggtSettings or {}
+function GetSettings() return VerloggtSettings end
 
-local function StatusReply()
+local function statusReply()
     if VerloggtSettings.isOn then
         return onMessage
     else
@@ -39,7 +40,7 @@ local function StatusReply()
     end
 end
 
-local function BossEncounterReply()
+local function bossEncounterReply()
     if VerloggtSettings.onlyBossEncounters then
         return bossEncouters
     else
@@ -48,7 +49,7 @@ local function BossEncounterReply()
 end
 
 local function slashCmdReply()
-    print(StatusReply() .. " " .. BossEncounterReply())
+    print(statusReply() .. " " .. bossEncounterReply())
 end
 
 SlashCmdList["VERLOGGT"] = function(msg)
@@ -63,8 +64,6 @@ SlashCmdList["VERLOGGT"] = function(msg)
     end
     slashCmdReply()
 end
-
-function GetSettings() return VerloggtSettings end
 
 local messageFrame = CreateFrame("ScrollingMessageFrame", "MyMessageFrame",
                                  UIParent, "BasicFrameTemplateWithInset")
@@ -116,23 +115,21 @@ local function updateMessageList(messages)
     messageFrame:SetSize(300, frameHeight + 40)
 end
 
-local function UpdateTime() if inCombat then currentTime = time() end end
+local function startCombatTimer() combatStartTime = time() end
 
-local function StartCombatTimer() combatStartTime = time() end
-
-function FormatSeconds(seconds)
+local function formatSeconds(seconds)
     local minutes = math.floor(seconds / 60)
     local remainingSeconds = seconds % 60
     return string.format("%02d:%02d", minutes, remainingSeconds)
 end
 
-local function GetCombatTimeStamp(timestamp)
+local function getCombatTimeStamp(timestamp)
     if combatStartTime ~= nil and timestamp ~= nil then
-        return FormatSeconds(difftime(timestamp, combatStartTime))
+        return formatSeconds(difftime(timestamp, combatStartTime))
     end
 end
 
-local function SaveSpell(spellID, timestamp, source)
+local function saveSpell(spellID, timestamp, source)
     return {spellID = spellID, timestamp = timestamp, source = source}
 end
 
@@ -141,7 +138,7 @@ local function contains(list, spellID)
     return false
 end
 
-local function PrintResult()
+local function printResult()
     if messageFrame:IsVisible() then return end
     local messages = {}
     for _, spell in ipairs(recordedSpells) do
@@ -152,7 +149,7 @@ local function PrintResult()
     messageFrame:Show()
 end
 
-local function IsBossEncounter()
+local function isBossEncounter()
     if C_Scenario.GetInfo() then
         return true
     else
@@ -160,41 +157,39 @@ local function IsBossEncounter()
     end
 end
 
-local function InitiateCombatLog()
-    if not inCombat then StartCombatTimer() end
+local function initiateCombatLog()
+    if not inCombat then startCombatTimer() end
     inCombat = true
-    UpdateTime()
 end
 
-local function CombatShouldBeLogged()
-    local isBossEncounter = IsBossEncounter()
+local function combatShouldBeLogged()
+    local isBossEncounter = isBossEncounter()
     return (VerloggtSettings.onlyBossEncounters and isBossEncounter) or
                not VerloggtSettings.onlyBossEncounters
 end
 
-local function CombatTimeHandler(self, event, ...)
+local function combatTimeHandler(self, event, ...)
     if event == "PLAYER_REGEN_DISABLED" then
-        if CombatShouldBeLogged then InitiateCombatLog() end
+        if combatShouldBeLogged then initiateCombatLog() end
     elseif event == "PLAYER_REGEN_ENABLED" then
         if inCombat then
             inCombat = false
             combatStartTime = nil
-            PrintResult()
+            printResult()
             recordedSpells = {}
         end
     end
 end
 
-local function CombatLogHandler(self, event, ...)
+local function combatLogHandler(self, event, ...)
     local timestamp, subEvent, _, sourceGUID, sourceName, _, _, destGUID,
           destName, _, _, spellID, spellName, spellSchool =
         CombatLogGetCurrentEventInfo()
 
     -- timestamps might be off if combat log timestamps are from server and not pc
     if subEvent == "SPELL_CAST_SUCCESS" then
-        UpdateTime()
         if contains(spellsToLookFor, spellID) then
-            local spellToSave = SaveSpell(spellName, GetCombatTimeStamp(
+            local spellToSave = saveSpell(spellName, getCombatTimeStamp(
                                               tonumber(timestamp)), sourceName)
             table.insert(recordedSpells, spellToSave)
         end
@@ -202,7 +197,7 @@ local function CombatLogHandler(self, event, ...)
     end
 end
 
-local function AddonLoadHandler()
+local function addonLoadHandler()
     message("Verloggt loaded..")
     if VerloggtSettings.isOn == nil then VerloggtSettings.isOn = true end
     if VerloggtSettings.onlyBossEncounters == nil then
@@ -210,17 +205,16 @@ local function AddonLoadHandler()
     end
 end
 
-local function EventHandler(self, event, ...)
-    if event == "ADDON_LOADED" then AddonLoadHandler() end
+local function eventHandler(self, event, ...)
+    if event == "ADDON_LOADED" then addonLoadHandler() end
 
-    -- do nothing if turned off
     if not VerloggtSettings.isOn then return end
 
     if event == "PLAYER_REGEN_DISABLED" or "PLAYER_REGEN_ENABLED" then
-        CombatTimeHandler(self, event, ...)
+        combatTimeHandler(self, event, ...)
     end
     if event == "COMBAT_LOG_EVENT_UNFILTERED" and inCombat then
-        CombatLogHandler(self, event, ...)
+        combatLogHandler(self, event, ...)
     end
 end
 
@@ -228,4 +222,4 @@ frame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 frame:RegisterEvent("ADDON_LOADED")
-frame:SetScript("OnEvent", EventHandler)
+frame:SetScript("OnEvent", eventHandler)
