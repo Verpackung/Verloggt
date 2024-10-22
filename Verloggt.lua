@@ -101,13 +101,8 @@ local function GetCombatTimeStamp()
     end
 end
 
-local function CreateRecordedSpell(spellID, timestamp)
-    return {spellID = spellID, timestamp = timestamp}
-end
-
-local function GetSpellInfo(spellID)
-    local spell = Spell:CreateFromSpellID(spellID)
-    return spell:GetSpellName()
+local function SaveSpell(spellID, timestamp, source)
+    return {spellID = spellID, timestamp = timestamp, source = source}
 end
 
 local function contains(list, spellID)
@@ -115,29 +110,12 @@ local function contains(list, spellID)
     return false
 end
 
-local function SpellCastHandler(self, event, ...)
-    if inCombat == false then return end
-    if event == "UNIT_SPELLCAST_SUCCEEDED" then
-        UpdateTime()
-        local unitTarget, castGUID, spellID = ...
-        if contains(spellsToLookFor, spellID) then
-            local tmpCombatTime = GetCombatTimeStamp()
-            local spellName = GetSpellInfo(spellID)
-            print("inserting: " .. spellName .. " - " .. tmpCombatTime)
-            table.insert(recordedSpells,
-                         CreateRecordedSpell(spellName, GetCombatTimeStamp()))
-        elseif spellID ~= nil then
-            print(unitTarget .. " " .. spellID .. " timestamp: " ..
-                      GetCombatTimeStamp())
-        end
-    end
-end
-
 local function PrintResult()
     print(recordedSpells)
     local messages = {}
     for _, spell in ipairs(recordedSpells) do
-        table.insert(messages, spell.spellID .. " - " .. spell.timestamp .. "\n")
+        table.insert(messages, spell.timestamp .. " - " .. spell.spellID ..
+                         " - " .. spell.source .. "\n")
     end
     updateMessageList(messages)
     messageFrame:Show()
@@ -160,16 +138,36 @@ local function CombatTimeHandler(self, event, ...)
     end
 end
 
+local function CombatLogHandler(self, event, ...)
+    local timestamp, subEvent, _, sourceGUID, sourceName, _, _, destGUID,
+          destName, _, _, spellID, spellName, spellSchool =
+        CombatLogGetCurrentEventInfo()
+
+    -- timestamp instead of calculation
+
+    if subEvent == "SPELL_CAST_SUCCESS" then
+        UpdateTime()
+        if contains(spellsToLookFor, spellID) then
+            local tmpCombatTime = GetCombatTimeStamp()
+            print("inserting: " .. spellName .. " - " .. tmpCombatTime)
+            table.insert(recordedSpells,
+                         SaveSpell(spellName, GetCombatTimeStamp(), sourceName))
+        end
+
+    end
+
+end
+
 local function EventHandler(self, event, ...)
-    if event == "UNIT_SPELLCAST_SUCCEEDED" then
-        SpellCastHandler(self, event, ...)
+    if event == "COMBAT_LOG_EVENT_UNFILTERED" then
+        CombatLogHandler(self, "COMBAT_LOG_EVENT_UNFILTERED", ...)
     end
     if event == "PLAYER_REGEN_DISABLED" or "PLAYER_REGEN_ENABLED" then
         CombatTimeHandler(self, event, ...)
     end
 end
 
-frame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+frame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 frame:SetScript("OnEvent", EventHandler)
