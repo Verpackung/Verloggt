@@ -15,21 +15,18 @@ local spellsToLookFor = {51505, 188196}
 local recordedSpells = {}
 
 local frame = CreateFrame("Frame")
-local currentTime
 local combatStartTime
 local inCombat = false
-VerloggtSettings = VerloggtSettings or {}
 
 local onMessage = "Verloggt is turned on!"
 local offMessage = "Verloggt is turned off!"
-
+VerloggtSettings = VerloggtSettings or {}
 local function printOnStatus()
     if VerloggtSettings.isOn then
         print(onMessage)
     else
         print(offMessage)
     end
-
 end
 
 SlashCmdList["VERLOGGT"] = function(msg)
@@ -41,28 +38,21 @@ SlashCmdList["VERLOGGT"] = function(msg)
         VerloggtSettings.isOn = not VerloggtSettings.isOn
     end
     printOnStatus()
-
 end
 
 function GetSettings() return VerloggtSettings end
 
--- Create a new frame
 local messageFrame = CreateFrame("ScrollingMessageFrame", "MyMessageFrame",
                                  UIParent, "BasicFrameTemplateWithInset")
-
--- Set the size and position
 messageFrame:SetSize(300, 200)
 messageFrame:SetPoint("TOP")
-
--- Set properties for scrolling
 messageFrame:SetJustifyH("LEFT")
-messageFrame:SetFading(false) -- Set to true if you want fading effects
-messageFrame:SetMaxLines(10) -- Maximum number of lines to display
-messageFrame:Clear() -- Clear any existing messages
-messageFrame:SetInsertMode("TOP") --
+messageFrame:SetFading(false)
+messageFrame:SetMaxLines(10)
+messageFrame:Clear()
+messageFrame:SetInsertMode("TOP")
 messageFrame:Hide()
 
--- Scroll Frame
 local scrollFrame = CreateFrame("ScrollFrame", nil, messageFrame,
                                 "UIPanelScrollFrameTemplate")
 scrollFrame:SetSize(300, 160)
@@ -83,8 +73,10 @@ messageFrame:SetScript("OnDragStop", function(self)
     self:StopMovingOrSizing()
     print("OnDragStop")
 end)
-
-messageFrame.CloseButton:SetScript("OnClick", function() messageFrame:Hide() end)
+messageFrame.CloseButton:SetScript("OnClick", function()
+    messageFrame:Hide()
+    messageFrame:Clear()
+end)
 
 -- Function to update the message list
 local function updateMessageList(messages)
@@ -98,7 +90,7 @@ local function updateMessageList(messages)
         messageList[i] = messageText
         height = height + 20 -- Increment height for each message
     end
-    messageList:SetHeight(height) -- Set the height of the message list frame
+    messageList:SetHeight(height)
     local frameHeight = math.min(height, 200)
     scrollFrame:SetSize(300, frameHeight)
     messageFrame:SetSize(300, frameHeight + 40)
@@ -121,12 +113,12 @@ function FormatSeconds(seconds)
     return string.format("%02d:%02d", minutes, remainingSeconds)
 end
 
-local function GetCombatTimeStamp()
-    if combatStartTime ~= nil and currentTime ~= nil then
-        return FormatSeconds(difftime(currentTime, combatStartTime))
+local function GetCombatTimeStamp(timestamp)
+    if combatStartTime ~= nil and timestamp ~= nil then
+        return FormatSeconds(difftime(timestamp, combatStartTime))
     elseif combatStartTime == nil then
         print("start time nil")
-    elseif currentTime == nil then
+    elseif timestamp == nil then
         print("current time nil")
     end
 end
@@ -149,7 +141,6 @@ local function PrintResult()
     end
     updateMessageList(messages)
     messageFrame:Show()
-
 end
 
 local function CombatTimeHandler(self, event, ...)
@@ -173,16 +164,16 @@ local function CombatLogHandler(self, event, ...)
           destName, _, _, spellID, spellName, spellSchool =
         CombatLogGetCurrentEventInfo()
 
-    -- test if i can just use timestamp here
+    -- timestamps mit be off if combat log timestamps are from server and not pc
     if subEvent == "SPELL_CAST_SUCCESS" then
         UpdateTime()
         if contains(spellsToLookFor, spellID) then
-            table.insert(recordedSpells,
-                         SaveSpell(spellName, GetCombatTimeStamp(), sourceName))
+            local spellToSave = SaveSpell(spellName, GetCombatTimeStamp(
+                                              tonumber(timestamp)), sourceName)
+            table.insert(recordedSpells, spellToSave)
         end
 
     end
-
 end
 
 local function EventHandler(self, event, ...)
@@ -194,11 +185,11 @@ local function EventHandler(self, event, ...)
     -- do nothing if turned off
     if not VerloggtSettings.isOn then return end
 
-    if event == "COMBAT_LOG_EVENT_UNFILTERED" then
-        CombatLogHandler(self, "COMBAT_LOG_EVENT_UNFILTERED", ...)
-    end
     if event == "PLAYER_REGEN_DISABLED" or "PLAYER_REGEN_ENABLED" then
         CombatTimeHandler(self, event, ...)
+    end
+    if event == "COMBAT_LOG_EVENT_UNFILTERED" and inCombat then
+        CombatLogHandler(self, event, ...)
     end
 end
 
