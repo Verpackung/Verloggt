@@ -1,5 +1,15 @@
 message("Verloggt loaded..")
 
+-- TODO: 
+-- add all important spells
+-- color code spells in outop
+-- check if encounter is mythic
+-- cleanup/fix output window
+-- savable variables to enable/disable with cmd
+-- check mrt timers
+-- maybe use something better for combat time
+-- spellnames instead of ids if it costs less performance
+
 -- 51505 lava burst, 188196 lightning bolt
 local spellsToLookFor = {51505, 188196}
 local recordedSpells = {}
