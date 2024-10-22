@@ -7,10 +7,16 @@
 -- spellnames instead of ids if it costs less performance
 -- scroll bar should only appear if content is too large
 -- first spell will never be recorded but shouldn't matter i guess lg
+-- ui for all settings
 SLASH_VERLOGGT1 = "/verloggt"
 
 -- 51505 lava burst, 188196 lightning bolt, 98008 Spirit Link, 114052 Ascendance, 108280 Healing Tide
-local spellsToLookFor = {51505, 188196, 98008, 114052, 108280}
+-- 51052 AMZ, 97462 rally, 3182 AM, 414660 mass barrier, 196718 darkness, 77764 roar, 192077 windrush
+-- 363534 rewind, 374968 time spiral
+local spellsToLookFor = {
+    98008, 114052, 108280, 51052, 97462, 3182, 414660, 196718, 77764, 192077,
+    363534, 374968
+}
 local recordedSpells = {}
 
 local frame = CreateFrame("Frame")
@@ -42,7 +48,7 @@ local function BossEncounterReply()
 end
 
 local function slashCmdReply()
-    print(StatusReply() .. "\n" .. BossEncounterReply())
+    print(StatusReply() .. " " .. BossEncounterReply())
 end
 
 SlashCmdList["VERLOGGT"] = function(msg)
@@ -223,4 +229,3 @@ frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 frame:RegisterEvent("ADDON_LOADED")
 frame:SetScript("OnEvent", EventHandler)
-
