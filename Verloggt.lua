@@ -19,24 +19,43 @@ local inCombat = false
 
 local onMessage = "Verloggt is turned on!"
 local offMessage = "Verloggt is turned off!"
+local bossEncouters = "Logging only Boss Encounters!"
+local allEncouters = "Logging all Encounters!"
+local slashStatus = "status"
+local slashBoss = "boss"
 VerloggtSettings = VerloggtSettings or {}
-local function printOnStatus()
+
+local function StatusReply()
     if VerloggtSettings.isOn then
-        print(onMessage)
+        return onMessage
     else
-        print(offMessage)
+        return offMessage
     end
 end
 
+local function BossEncounterReply()
+    if VerloggtSettings.onlyBossEncounters then
+        return bossEncouters
+    else
+        return allEncouters
+    end
+end
+
+local function slashCmdReply()
+    print(StatusReply() .. "\n" .. BossEncounterReply())
+end
+
 SlashCmdList["VERLOGGT"] = function(msg)
-    print(msg)
-    if msg == "status" then
-        printOnStatus()
+    if msg == slashStatus then
+        slashCmdReply()
         return
+    elseif msg == slashBoss then
+        VerloggtSettings.onlyBossEncounters =
+            not VerloggtSettings.onlyBossEncounters
     else
         VerloggtSettings.isOn = not VerloggtSettings.isOn
     end
-    printOnStatus()
+    slashCmdReply()
 end
 
 function GetSettings() return VerloggtSettings end
@@ -127,11 +146,29 @@ local function PrintResult()
     messageFrame:Show()
 end
 
+local function IsBossEncounter()
+    if C_Scenario.GetInfo() then
+        return true
+    else
+        return false
+    end
+end
+
+local function InitiateCombatLog()
+    if not inCombat then StartCombatTimer() end
+    inCombat = true
+    UpdateTime()
+end
+
+local function CombatShouldBeLogged()
+    local isBossEncounter = IsBossEncounter()
+    return (VerloggtSettings.onlyBossEncounters and isBossEncounter) or
+               not VerloggtSettings.onlyBossEncounters
+end
+
 local function CombatTimeHandler(self, event, ...)
     if event == "PLAYER_REGEN_DISABLED" then
-        if not inCombat then StartCombatTimer() end
-        inCombat = true
-        UpdateTime()
+        if CombatShouldBeLogged then InitiateCombatLog() end
     elseif event == "PLAYER_REGEN_ENABLED" then
         if inCombat then
             inCombat = false
@@ -162,6 +199,9 @@ end
 local function AddonLoadHandler()
     message("Verloggt loaded..")
     if VerloggtSettings.isOn == nil then VerloggtSettings.isOn = true end
+    if VerloggtSettings.onlyBossEncounters == nil then
+        VerloggtSettings.onlyBossEncounters = true
+    end
 end
 
 local function EventHandler(self, event, ...)
