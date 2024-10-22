@@ -3,15 +3,14 @@
 -- color code spells in outop
 -- check if encounter is mythic
 -- cleanup/fix output window
--- savable variables to enable/disable with cmd
 -- check mrt timers
--- maybe use something better for combat time
 -- spellnames instead of ids if it costs less performance
 -- scroll bar should only appear if content is too large
+-- first spell will never be recorded but shouldn't matter i guess lg
 SLASH_VERLOGGT1 = "/verloggt"
 
--- 51505 lava burst, 188196 lightning bolt
-local spellsToLookFor = {51505, 188196}
+-- 51505 lava burst, 188196 lightning bolt, 98008 Spirit Link, 114052 Ascendance, 108280 Healing Tide
+local spellsToLookFor = {51505, 188196, 98008, 114052, 108280}
 local recordedSpells = {}
 
 local frame = CreateFrame("Frame")
@@ -65,14 +64,10 @@ scrollFrame:SetScrollChild(messageList)
 messageFrame:SetMovable(true)
 messageFrame:EnableMouse(true)
 messageFrame:RegisterForDrag("LeftButton")
-messageFrame:SetScript("OnDragStart", function(self, button)
-    self:StartMoving()
-    print("OnDragStart", button)
-end)
-messageFrame:SetScript("OnDragStop", function(self)
-    self:StopMovingOrSizing()
-    print("OnDragStop")
-end)
+messageFrame:SetScript("OnDragStart",
+                       function(self, button) self:StartMoving() end)
+messageFrame:SetScript("OnDragStop",
+                       function(self) self:StopMovingOrSizing() end)
 messageFrame.CloseButton:SetScript("OnClick", function()
     messageFrame:Hide()
     messageFrame:Clear()
@@ -98,28 +93,17 @@ end
 
 local function UpdateTime() if inCombat then currentTime = time() end end
 
-local function StartCombatTimer()
-    messageFrame:Hide()
-    messageFrame:Clear()
-    combatStartTime = time()
-    print("combat started " .. combatStartTime)
-end
+local function StartCombatTimer() combatStartTime = time() end
 
 function FormatSeconds(seconds)
     local minutes = math.floor(seconds / 60)
     local remainingSeconds = seconds % 60
-
-    -- Format minutes and seconds to always be two digits
     return string.format("%02d:%02d", minutes, remainingSeconds)
 end
 
 local function GetCombatTimeStamp(timestamp)
     if combatStartTime ~= nil and timestamp ~= nil then
         return FormatSeconds(difftime(timestamp, combatStartTime))
-    elseif combatStartTime == nil then
-        print("start time nil")
-    elseif timestamp == nil then
-        print("current time nil")
     end
 end
 
@@ -133,7 +117,7 @@ local function contains(list, spellID)
 end
 
 local function PrintResult()
-    print(recordedSpells)
+    if messageFrame:IsVisible() then return end
     local messages = {}
     for _, spell in ipairs(recordedSpells) do
         table.insert(messages, spell.timestamp .. " - " .. spell.spellID ..
@@ -151,7 +135,6 @@ local function CombatTimeHandler(self, event, ...)
     elseif event == "PLAYER_REGEN_ENABLED" then
         if inCombat then
             inCombat = false
-            print("combat timer stopped ")
             combatStartTime = nil
             PrintResult()
             recordedSpells = {}
@@ -164,7 +147,7 @@ local function CombatLogHandler(self, event, ...)
           destName, _, _, spellID, spellName, spellSchool =
         CombatLogGetCurrentEventInfo()
 
-    -- timestamps mit be off if combat log timestamps are from server and not pc
+    -- timestamps might be off if combat log timestamps are from server and not pc
     if subEvent == "SPELL_CAST_SUCCESS" then
         UpdateTime()
         if contains(spellsToLookFor, spellID) then
@@ -176,11 +159,13 @@ local function CombatLogHandler(self, event, ...)
     end
 end
 
+local function AddonLoadHandler()
+    message("Verloggt loaded..")
+    if VerloggtSettings.isOn == nil then VerloggtSettings.isOn = true end
+end
+
 local function EventHandler(self, event, ...)
-    if event == "ADDON_LOADED" then
-        message("Verloggt loaded..")
-        if VerloggtSettings.isOn == nil then VerloggtSettings.isOn = true end
-    end
+    if event == "ADDON_LOADED" then AddonLoadHandler() end
 
     -- do nothing if turned off
     if not VerloggtSettings.isOn then return end
