@@ -1,4 +1,5 @@
 -- TODO: 
+-- dont fire end of combat when dying in bossfight
 -- add all important spells
 -- color code spells in outop
 -- check if encounter is mythic
@@ -10,12 +11,12 @@
 -- ui for all settings
 SLASH_VERLOGGT1 = "/verloggt"
 
--- 51505 lava burst, 188196 lightning bolt, 98008 Spirit Link, 114052 Ascendance, 108280 Healing Tide
--- 51052 AMZ, 97462 rally, 3182 AM, 414660 mass barrier, 196718 darkness, 77764 roar, 192077 windrush
--- 363534 rewind, 374968 time spiral
+-- 188196 lightning bolt, 98008 Spirit Link, 114052 Ascendance, 108280 Healing Tide
+-- 51052 AMZ, 97462 rally, 3182 AM, 414660 mass barrier, 196718 darkness, 106898 roar, 192077 windrush
+-- 363534 rewind, 374968 time spiral, 406732 spatial paradox, 64843 hymn, hope 64901
 local spellsToLookFor = {
-    98008, 114052, 108280, 51052, 97462, 3182, 414660, 196718, 77764, 192077,
-    363534, 374968
+    98008, 114052, 108280, 51052, 97462, 3182, 414660, 196718, 106898, 192077,
+    363534, 374968, 406732, 64843, 64901
 }
 local recordedSpells = {}
 
@@ -67,7 +68,7 @@ end
 
 local messageFrame = CreateFrame("ScrollingMessageFrame", "MyMessageFrame",
                                  UIParent, "BasicFrameTemplateWithInset")
-messageFrame:SetSize(300, 200)
+messageFrame:SetSize(300, 400)
 messageFrame:SetPoint("TOP")
 messageFrame:SetJustifyH("LEFT")
 messageFrame:SetFading(false)
@@ -82,7 +83,7 @@ scrollFrame:SetSize(300, 160)
 scrollFrame:SetPoint("TOPLEFT", 10, -30)
 
 local messageList = CreateFrame("Frame", nil, scrollFrame)
-messageList:SetSize(300, 160)
+messageList:SetSize(300, 400)
 scrollFrame:SetScrollChild(messageList)
 
 messageFrame:SetMovable(true)
@@ -140,6 +141,7 @@ end
 
 local function printResult()
     if messageFrame:IsVisible() then return end
+    if (#recordedSpells == 0) then return end
     local messages = {}
     for _, spell in ipairs(recordedSpells) do
         table.insert(messages, spell.timestamp .. " - " .. spell.spellID ..
@@ -160,6 +162,7 @@ end
 local function initiateCombatLog()
     if not inCombat then startCombatTimer() end
     inCombat = true
+    recordedSpells = {}
 end
 
 local function combatShouldBeLogged()
@@ -168,20 +171,19 @@ local function combatShouldBeLogged()
                not VerloggtSettings.onlyBossEncounters
 end
 
-local function combatTimeHandler(self, event, ...)
+local function combatTimeHandler(event)
     if event == "PLAYER_REGEN_DISABLED" then
-        if combatShouldBeLogged then initiateCombatLog() end
+        if combatShouldBeLogged() then initiateCombatLog() end
     elseif event == "PLAYER_REGEN_ENABLED" then
         if inCombat then
             inCombat = false
             combatStartTime = nil
             printResult()
-            recordedSpells = {}
         end
     end
 end
 
-local function combatLogHandler(self, event, ...)
+local function combatLogHandler(...)
     local timestamp, subEvent, _, sourceGUID, sourceName, _, _, destGUID,
           destName, _, _, spellID, spellName, spellSchool =
         CombatLogGetCurrentEventInfo()
@@ -198,7 +200,6 @@ local function combatLogHandler(self, event, ...)
 end
 
 local function addonLoadHandler()
-    message("Verloggt loaded..")
     if VerloggtSettings.isOn == nil then VerloggtSettings.isOn = true end
     if VerloggtSettings.onlyBossEncounters == nil then
         VerloggtSettings.onlyBossEncounters = true
@@ -211,10 +212,10 @@ local function eventHandler(self, event, ...)
     if not VerloggtSettings.isOn then return end
 
     if event == "PLAYER_REGEN_DISABLED" or "PLAYER_REGEN_ENABLED" then
-        combatTimeHandler(self, event, ...)
+        combatTimeHandler(event)
     end
     if event == "COMBAT_LOG_EVENT_UNFILTERED" and inCombat then
-        combatLogHandler(self, event, ...)
+        combatLogHandler(...)
     end
 end
 
